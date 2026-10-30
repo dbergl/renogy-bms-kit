@@ -1,0 +1,20 @@
+# Private list of names the scrub check blocks; never published.
+.scrub-blocklist
+
+# Firmware, vendor tools and Ghidra projects stay on your machine.
+*.s19
+*.s28
+*.s37
+*.srec
+*.hex
+*.abs
+*.bin
+*.dfu
+*.gpr
+*.rep/
+*.lock
+*.lock~
+work/
+
+__pycache__/
+.pytest_cache/

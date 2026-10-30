@@ -1,0 +1,3 @@
+pytest>=7
+python-can>=4.3   # tools/rvc_command.py
+pyserial>=3.5     # tools/ws500_serial.py

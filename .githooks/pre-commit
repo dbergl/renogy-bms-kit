@@ -1,0 +1,3 @@
+#!/bin/sh
+# Refuse a commit that would publish personal information or firmware.
+exec python3 tools/scrub_check.py
