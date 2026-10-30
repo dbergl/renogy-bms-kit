@@ -1,0 +1,4 @@
+# Where each struct is applied (count > 1 makes an array).
+address	struct	count
+0fe410	alarm_object	11
+0fe626	bms_settings	1
