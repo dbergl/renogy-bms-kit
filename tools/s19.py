@@ -15,21 +15,28 @@ class Record(NamedTuple):
 ADDRESS_BYTES = {0: 2, 1: 2, 2: 3, 3: 4, 5: 2, 6: 3, 7: 4, 8: 3, 9: 2}
 
 
+def parse_line(line: str, where: str = '') -> Record | None:
+    """One record, checksum verified; None for a blank line."""
+    line = line.strip()
+    if not line:
+        return None
+    if len(line) < 4 or line[0] != 'S' or not line[1].isdigit():
+        raise ValueError(f'{where}: not an S-record')
+    kind = int(line[1])
+    body = bytes.fromhex(line[2:])
+    if body[0] != len(body) - 1 or (sum(body) & 0xFF) != 0xFF:
+        raise ValueError(f'{where}: bad length or checksum')
+    width = ADDRESS_BYTES[kind]
+    return Record(kind, int.from_bytes(body[1:1 + width], 'big'), body[1 + width:-1])
+
+
 def parse(path: Path) -> list[Record]:
     """Every record in the file, checksums verified."""
     records = []
     for number, line in enumerate(Path(path).read_text().splitlines(), 1):
-        line = line.strip()
-        if not line:
-            continue
-        if line[0] != 'S' or not line[1].isdigit():
-            raise ValueError(f'{path}:{number}: not an S-record')
-        kind = int(line[1])
-        body = bytes.fromhex(line[2:])
-        if body[0] != len(body) - 1 or (sum(body) & 0xFF) != 0xFF:
-            raise ValueError(f'{path}:{number}: bad length or checksum')
-        width = ADDRESS_BYTES[kind]
-        records.append(Record(kind, int.from_bytes(body[1:1 + width], 'big'), body[1 + width:-1]))
+        r = parse_line(line, f'{path}:{number}')
+        if r:
+            records.append(r)
     return records
 
 
