@@ -1,87 +1,87 @@
 # Named RAM variables, I/O registers and flash data. kind: ram|io|flash.
 address	name	kind	summary
-000000	PORTA	io	
-000001	PORTB	io	
-000002	DDRA	io	
-000003	DDRB	io	
-00003f	ARMCOP	io	
-000121	IVBR	io	
-000127	INT_CFADDR	io	
-000140	CAN0_base	io	
-000180	CAN1_base	io	
-000240	PTT	io	
-000250	PTM	io	
-000260	PTH	io	
-000280	CAN4_base	io	
-000340	PITCFLMT	io	
-000380	XGMCTL	io	
-0fe250	g_cmd999_param0	ram	
-0fe252	g_cmd999_param1	ram	
-0fe254	g_cmd999_byte6	ram	
-0fe255	g_cmd999_byte7	ram	
-0fe256	g_heater_overtemp_flag	ram	
-0fe32c	g_main_task_flags	ram	
-0fe33a	g_temp_max_0p1C	ram	
-0fe33c	g_temp_min_0p1C	ram	
-0fe33e	g_temp_heaterchk_0p1C	ram	
-0fe34a	g_temp_max_idx	ram	
-0fe34b	g_temp_min_idx	ram	
-0fe34c	g_relay_discharge_PA1	ram	
-0fe34d	g_relay_dcdc_PA2	ram	
-0fe34e	g_relay_precharge_a_PA0	ram	
-0fe34f	g_relay_precharge_b_PA0	ram	
-0fe350	g_relay_heater_PA3	ram	
-0fe36e	g_soc_float	ram	
-0fe410	g_alarm_obj0	ram	
-0fe411	g_alarm_obj1	ram	
-0fe412	g_alarm_obj2	ram	
-0fe413	g_alarm_obj3	ram	
-0fe414	g_alarm_cellOV	ram	
-0fe415	g_alarm_tempHigh	ram	
-0fe416	g_alarm_tempLow_heater	ram	
-0fe417	g_alarm_cellUV	ram	
-0fe418	g_alarm_totalOV	ram	
-0fe419	g_alarm_totalUV	ram	
-0fe41a	g_alarm_socLow	ram	
-0fe41b	g_relay_cut_mask	ram	
-0fe41c	g_alarm_chgTempHigh	ram	
-0fe41d	g_alarm_dchTempHigh	ram	
-0fe41e	g_alarm_chgTempLow	ram	
-0fe41f	g_alarm_dchTempLow	ram	
-0fe420	g_alarm_ptr_table	ram	
-0fe445	g_war_max_level	ram	
-0fe446	g_war_count	ram	
-0fe5c0	g_extmem_record	ram	
-0fe5c2	g_heater_retry_cnt	ram	
-0fe5dc	g_heater_below_floor	ram	
-0fe5e4	g_cell_max_mV	ram	
-0fe5e7	g_cell_min_mV	ram	
-0fe5ee	g_total_volt_0p1V	ram	
-0fe61a	g_current_float	ram	
-0fe61e	g_can4_regs_ptr	ram	
-0fe622	g_can_x_regs_ptr	ram	
-0fe626	g_settings_frame410	ram	
-0fe62e	g_settings_frame411	ram	
-0fe636	g_settings_frame412	ram	
-0fe63e	g_settings_frame413	ram	
-0fe646	g_settings_frame414	ram	
-0fe64e	g_settings_frame415	ram	
-0fe656	g_settings_frame416	ram	
-0fe65e	g_settings_frame417	ram	
-0fe666	g_settings_frame418	ram	
-0fe66e	g_settings_frame419	ram	
-0fe676	g_settings_frame41A	ram	
-0fe67e	g_settings_dirty_bits	ram	
-0fe680	g_msg300_data	ram	
-0fe688	g_msg310_data	ram	
-0fe690	g_msg311_data	ram	
-0fe698	g_msg312_data	ram	
-0fe6a0	g_msg313_data	ram	
-0fe76a	g_flag_cmd500_02	ram	
-0fe898	g_flag_cmd500_01	ram	
-0fe8e0	g_tx504_data	ram	
-0fe8e6	g_tx504_relay_byte	ram	
-0febe6	g_work_mode	ram	
-0febec	g_sys_state	ram	
-0febee	g_chg_flag_a	ram	
-0febef	g_chg_flag_b	ram	
+000000	PORTA	io	Port A data: PA0 precharge, PA1 discharge contactor, PA2 DC-DC contactor, PA3 heater relay (written by relay_write_portA).
+000001	PORTB	io	Port B data: bit5 set at the end of init_all; bit6 toggled by the 10 ms PIT interrupt. Purposes not established.
+000002	DDRA	io	Port A direction: all outputs (0xFF), set by portA_init.
+000003	DDRB	io	Port B direction: bits 5 and 6 are made outputs at boot.
+00003f	ARMCOP	io	COP watchdog restart register: writing 0x55 then 0xAA kicks the watchdog (every 10 ms from main, and in delay loops).
+000121	IVBR	io	Interrupt vector base: set to 0x7F by clock_pll_init, so the CPU vectors sit at 0x7F10-0x7FFF.
+000127	INT_CFADDR	io	Interrupt configuration address: selects the vector block whose routing and priority are written next (XGATE setup).
+000140	CAN0_base	io	MSCAN0 register block. The firmware never initializes CAN0, so ISR_CAN0_rx never runs.
+000180	CAN1_base	io	MSCAN1 register block: the RV-C / charge-controller bus, 250 kbit/s, open filters. Base pointer in g_can_x_regs_ptr.
+000240	PTT	io	Port T data: bits 0-2 are driven by the measurement routines. Purpose not established.
+000250	PTM	io	Port M data: bit6 high while a Modbus reply is sent (Likely RS-485 driver enable); bit7 used by the cell-monitor routines.
+000260	PTH	io	Port H data: bit3 toggled every 1 s by main (status LED); bits 1-2 driven by the measurement routines.
+000280	CAN4_base	io	MSCAN4 register block: the BMS command and telemetry bus, 250 kbit/s, open filters. Base pointer in g_can4_regs_ptr.
+000340	PITCFLMT	io	PIT control register: pit_init writes 0xE0 (timer enabled, stopped in wait and freeze modes).
+000380	XGMCTL	io	XGATE module control: written 0xFBC1 at boot (XGATE enabled, stops in freeze mode, interrupts enabled).
+0fe250	g_cmd999_param0	ram	CAN4 ext 0x999 d0:d1 (word). Dead debug command in stock: nothing reads it. The patches make the command inert.
+0fe252	g_cmd999_param1	ram	CAN4 ext 0x999 d2:d3 (word). Dead debug command in stock: nothing reads it. The patches make the command inert.
+0fe254	g_cmd999_byte6	ram	CAN4 ext 0x999 d6. Dead debug command in stock: nothing reads it. The patches make the command inert.
+0fe255	g_cmd999_byte7	ram	CAN4 ext 0x999 d7. Dead debug command in stock: nothing reads it. The patches make the command inert.
+0fe256	g_heater_overtemp_flag	ram	1 = heater output inhibited: heater-check temperature above 40.0 °C for 30 calls; 0 once below 39.1 °C.
+0fe32c	g_main_task_flags	ram	PIT-derived task flags: bit0 10 ms (COP), bit1 50 ms, bit2 100 ms main task, bit3 1 s LED, bit7 500 ms.
+0fe33a	g_temp_max_0p1C	ram	Hottest of the four temperature probes, signed, 0.1 °C.
+0fe33c	g_temp_min_0p1C	ram	Coldest of the four temperature probes, signed, 0.1 °C. Drives the low-temperature alarms and the heater.
+0fe33e	g_temp_heaterchk_0p1C	ram	Heater-check temperature, 0.1 °C: mean of the 4 probes (spread < 10 °C), else (sum - 2 x max) / 2.
+0fe34a	g_temp_max_idx	ram	Probe number (1-4) of the hottest probe.
+0fe34b	g_temp_min_idx	ram	Probe number (1-4) of the coldest probe.
+0fe34c	g_relay_discharge_PA1	ram	Relay object for PA1 (discharge / 48 V contactor): bit0 request, bit2 output, bit3 ready.
+0fe34d	g_relay_dcdc_PA2	ram	Relay object for PA2 (DC-DC / total-negative contactor): bit0 request, bit2 output, bit3 ready (gates PA1 and heater).
+0fe34e	g_relay_precharge_a_PA0	ram	Precharge object used by the PA1 sequence: bit2 drives PA0; bit1 set after 7 failed precharge retries.
+0fe34f	g_relay_precharge_b_PA0	ram	Precharge object used by the PA2 sequence: bit2 drives PA0; bit1 set after 7 failed precharge retries.
+0fe350	g_relay_heater_PA3	ram	Relay object for PA3 heater: bit0 request (heater_control), bit2 output (request and no over-temp inhibit).
+0fe36e	g_soc_float	ram	State of charge, % as a single-precision float.
+0fe410	g_alarm_obj0	ram	Charge-overcurrent alarm object: bits 0-2 L1-L3, bit3 reset, bit4 open PA1, bit5 open PA2, bits 6-7 level.
+0fe411	g_alarm_obj1	ram	Discharge-overcurrent alarm object (same bit layout as g_alarm_obj0).
+0fe412	g_alarm_obj2	ram	Cell-voltage-difference alarm object (diff_vol1/2): L1/L2 and level bits; no contactor-cut bits.
+0fe413	g_alarm_obj3	ram	Temperature-difference alarm object (diff_temp1/2): L1/L2 and level bits; no contactor-cut bits.
+0fe414	g_alarm_cellOV	ram	Cell overvoltage alarm object: bits 0-2 L1-L3, bit3 reset, bit4 open PA1, bits 6-7 level.
+0fe415	g_alarm_tempHigh	ram	High-temperature alarm object: copy of the charge or discharge high-temp object for the current work mode.
+0fe416	g_alarm_tempLow_heater	ram	Low-temp alarm object (charge or discharge copy); bits 4-5 also carry the heater's PA1/PA2 cut requests.
+0fe417	g_alarm_cellUV	ram	Cell undervoltage alarm object: bits 0-2 L1-L3, bit3 reset, bit4 open PA1, bit5 shed PA2, bits 6-7 level.
+0fe418	g_alarm_totalOV	ram	Pack overvoltage alarm object: bits 0-2 L1-L3, bit3 reset, bit4 open PA1, bits 6-7 level.
+0fe419	g_alarm_totalUV	ram	Pack undervoltage alarm object: bits 0-2 L1-L3, bit3 reset, bit4 open PA1, bit5 shed PA2, bits 6-7 level.
+0fe41a	g_alarm_socLow	ram	Low-SoC alarm object (SoC1/SoC2): L1/L2 and level bits; no contactor-cut bits.
+0fe41b	g_relay_cut_mask	ram	OR of bits 4-5 over the 11 alarm objects: bit4 = open PA1 (discharge), bit5 = open PA2 (DC-DC).
+0fe41c	g_alarm_chgTempHigh	ram	Charge high-temperature alarm object (ch_temp_h1-h3): L1-L3, reset, PA1/PA2 cut and level bits.
+0fe41d	g_alarm_dchTempHigh	ram	Discharge high-temperature alarm object (dch_temp_h1-h3): L1-L3, reset, PA1/PA2 cut and level bits.
+0fe41e	g_alarm_chgTempLow	ram	Charge low-temperature alarm object (ch_temp_l1-l3): L1-L3, reset and level bits.
+0fe41f	g_alarm_dchTempLow	ram	Discharge low-temperature alarm object (dch_temp_l1-l3): L1-L3, reset, PA1/PA2 cut and level bits.
+0fe420	g_alarm_ptr_table	ram	Table of 11 pointers to the alarm objects 0x2410-0x241A, filled by alarm_table_init.
+0fe445	g_war_max_level	ram	Highest alarm level (0-3) over the 11 alarm objects; sent in CAN4 0x504 d4.
+0fe446	g_war_count	ram	Number of alarm objects with a nonzero level; sent in CAN4 0x504 d5.
+0fe5c0	g_extmem_record	ram	4-byte record kept in external memory: magic 0x55AA, g_heater_retry_cnt, then bit0 = UV DC-DC shed latch.
+0fe5c2	g_heater_retry_cnt	ram	Heater attempts ended by UV L3 (saved in g_extmem_record); 3 or more locks the heater out until cleared.
+0fe5dc	g_heater_below_floor	ram	1 while the coldest probe is below dch_temp_l3 (released 1 °C above); in charge mode the heater stays off.
+0fe5e4	g_cell_max_mV	ram	Highest cell voltage, mV (word); the cell index follows at 0x25E6.
+0fe5e7	g_cell_min_mV	ram	Lowest cell voltage, mV (word); the cell index follows at 0x25E9.
+0fe5ee	g_total_volt_0p1V	ram	Pack voltage, 0.1 V.
+0fe61a	g_current_float	ram	Pack current as a float, A, from a second conversion; used by heater supervision. Sign convention not established.
+0fe61e	g_can4_regs_ptr	ram	Pointer to the CAN4 register block (0x0280), used by the command ISR and the telemetry scheduler.
+0fe622	g_can_x_regs_ptr	ram	Pointer to the CAN1 register block (0x0180), used by ISR_CAN1_rx and can_settings_multiframe_tx.
+0fe626	g_settings_frame410	ram	Settings frame 0x410 (8 bytes): capacity AH, cell count, temperature-probe count, module count.
+0fe62e	g_settings_frame411	ram	Settings frame 0x411: charge overcurrent L1-L3 (ch_cur_h1-h3, A) and discharge overcurrent L1 (A).
+0fe636	g_settings_frame412	ram	Settings frame 0x412: discharge overcurrent L2-L3 (A), pack overvoltage L1-L2 (0.1 V).
+0fe63e	g_settings_frame413	ram	Settings frame 0x413: pack overvoltage L3 and pack undervoltage L1-L3 (0.1 V).
+0fe646	g_settings_frame414	ram	Settings frame 0x414: cell overvoltage L1-L3 (mV), charge high-temp L1-L2 (°C).
+0fe64e	g_settings_frame415	ram	Settings frame 0x415: charge high-temp L3, discharge high-temp L1-L3, charge low-temp L1-L3, discharge low-temp L1 (°C).
+0fe656	g_settings_frame416	ram	Settings frame 0x416: discharge low-temp L2-L3 (°C), cell undervoltage L1-L3 (mV).
+0fe65e	g_settings_frame417	ram	Settings frame 0x417: cell-voltage difference L1-L3 (mV), temperature difference L1-L2 (°C).
+0fe666	g_settings_frame418	ram	Settings frame 0x418: temperature difference L3 (°C), feedback overcurrent L1-L3 (A), SoC low L1 (%).
+0fe66e	g_settings_frame419	ram	Settings frame 0x419: SoC low L2-L3 (%), IR1-IR3 (stock never reads IR; the cvl recipe uses IR3).
+0fe676	g_settings_frame41A	ram	Settings frame 0x41A (8 bytes); layout not decoded.
+0fe67e	g_settings_dirty_bits	ram	One bit per settings frame received (0x410-0x41A); all 11 (0xFF07) queues the save to external memory.
+0fe680	g_msg300_data	ram	Last CAN4 0x300 payload (8 bytes): d0 bit2 + valid checksum resets all alarms; d0 bit0 enables the 0x311 SoC set.
+0fe688	g_msg310_data	ram	Last CAN4 0x310 payload (8 bytes). Use not established.
+0fe690	g_msg311_data	ram	Last CAN4 0x311 payload (8 bytes): d5 = SoC % applied when the last 0x300 had d0 bit0 set.
+0fe698	g_msg312_data	ram	Last CAN4 0x312 payload (8 bytes). Use not established.
+0fe6a0	g_msg313_data	ram	Last CAN4 0x313 payload (8 bytes). Use not established.
+0fe76a	g_flag_cmd500_02	ram	Settings-dump table header: bit0 = dump of 0x450-0x45A pending (CAN4 0x500 d2=02), bits 1-7 = 11 entries.
+0fe898	g_flag_cmd500_01	ram	Telemetry table header: bit0 = enabled (set at boot and by CAN4 0x500 d2=01), bits 1-7 = entry count.
+0fe8e0	g_tx504_data	ram	Payload of CAN4 frame 0x504 (8 bytes): alarm bits, d4 max alarm level, d5 alarm count, d6 relay byte.
+0fe8e6	g_tx504_relay_byte	ram	0x504 d6: bit0 PA1 discharge, bit1 PA2 DC-DC, bit4 PA0 precharge, bit5 PA3 heater; other bits 0.
+0febe6	g_work_mode	ram	Work mode: 1 = charge, 3 = discharge, 0 = none (mode-dependent 100 ms tasks skipped). Also set by CAN4 0x100 d3.
+0febec	g_sys_state	ram	System state: 1 in init_all, 2 until the power-on alarm pass, 3 running. Commands accept 3 or 4; no writer of 4 found.
+0febee	g_chg_flag_a	ram	1 when charge was detected with PA1 open (mode_detect_chg_dch); lets the heater start or retry.
+0febef	g_chg_flag_b	ram	1 when charge was detected with PA1 closed (mode_detect_chg_dch); lets the heater start or retry.
