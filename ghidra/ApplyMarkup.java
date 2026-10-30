@@ -1,7 +1,7 @@
 //Apply the kit's markup (markup/*.tsv): data types, function names, labels, plate comments, struct applications
 //@category Setup
 //
-// Argument: the markup directory. Run after SetupHCS12.java and FixupDisasm.java.
+// Argument: the markup directory (the GUI asks for it). Run after SetupHCS12.java and FixupDisasm.java.
 // Prints "MARKUP functions=N labels=N structs=N uses=N errors=N"; every error is listed
 // above that line and reported through Msg.error.
 import ghidra.app.script.GhidraScript;
@@ -146,7 +146,8 @@ public class ApplyMarkup extends GhidraScript {
 
     @Override
     public void run() throws Exception {
-        Path dir = Paths.get(getScriptArgs()[0]);
+        Path dir = getScriptArgs().length > 0 ? Paths.get(getScriptArgs()[0])
+                : askDirectory("Select the kit's markup folder", "Apply").toPath();
         ensureRam();
         int nStructs = applyStructs(dir);
         int nFunctions = applyFunctions(dir);

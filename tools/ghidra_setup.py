@@ -52,15 +52,11 @@ def main() -> int:
     if not ok:
         print(f'error: {reason}')
         return 1
-    lock = args.project / f'{args.name}.lock'
-    if lock.exists():
-        print(f'error: {lock} exists: Ghidra is open on this project. Close it and run again.')
-        return 1
     args.project.mkdir(parents=True, exist_ok=True)
     global_s19 = args.project / 'stock_global.s19'
     convert(args.stock, global_s19)
     log = args.project / f'{args.name}-setup.log'
-    print(f'Importing and analyzing (several minutes); log: {log}')
+    print(f'Importing and analyzing (about a minute); log: {log}')
     try:
         result = ghidra_run.run(args.ghidra, args.project, args.name, headless_args(global_s19), log)
     except ghidra_run.ProjectLocked as e:
