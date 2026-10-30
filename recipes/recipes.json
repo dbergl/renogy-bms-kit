@@ -1,0 +1,43 @@
+[
+  {
+    "name": "rvc_status",
+    "flags": [],
+    "sha256": "bf02616f29837170cd52efb314d446631574f403670b8e7598ff4ac0064eac72",
+    "status": "flashed",
+    "summary": "Manual heater and alarm-mask commands over RV-C, CAN1 poll fix, status broadcast"
+  },
+  {
+    "name": "cvl",
+    "flags": [
+      "--cvl",
+      "--cvl570"
+    ],
+    "sha256": "2a45aab9931e877cb701d111d515c9574c1ba1857152112de3efff61ea5865f6",
+    "status": "emulated, not flashed",
+    "summary": "Adds: IR3 sets the charge voltage limit, 52.0-57.0 V (IR3 = 0 keeps stock 54.7 V)"
+  },
+  {
+    "name": "slew256",
+    "flags": [
+      "--cvl",
+      "--cvl570",
+      "--slew256"
+    ],
+    "sha256": "102e272137500e96c41857899c6af5a1e093c147f24cd5a207a0fc7d6f4f5ed1",
+    "status": "emulated, not flashed",
+    "summary": "Adds: the charge current limit falls at most 1/256 per 100 ms"
+  },
+  {
+    "name": "uvcharge",
+    "flags": [
+      "--cvl",
+      "--cvl570",
+      "--slew256",
+      "--uvcharge",
+      "--diffmask"
+    ],
+    "sha256": "a66ff1d50969024f68b40c0e0b074d9056280b65c36670ef66680d67cd1cb6e9",
+    "status": "emulated, not flashed",
+    "summary": "Adds: the alternator can charge a low pack; the mask lease also hides the difference L1 alarms"
+  }
+]
