@@ -68,3 +68,34 @@ def test_default_output_name(stock, tmp_path):
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
     assert sha256(tmp_path / 'V137.4.5_cvl_patch.s19') == RECIPES[1]['sha256']
+
+
+def test_mismatch_leaves_no_image(stock, tmp_path, monkeypatch):
+    real = build_recipe.load_recipes
+    monkeypatch.setattr(build_recipe, 'load_recipes',
+                        lambda: {n: r._replace(sha256='0' * 64) for n, r in real().items()})
+    out = tmp_path / 'V137.4.5_cvl_patch.s19'
+    out.write_text('previous good image')
+    with pytest.raises(build_recipe.RecipeMismatch):
+        build_recipe.build(stock, 'cvl', out)
+    assert out.read_text() == 'previous good image'
+    assert list(tmp_path.iterdir()) == [out]
+
+
+def test_make_patch_refuses_to_overwrite_stock(stock, tmp_path):
+    copy = tmp_path / 'stock.s19'
+    shutil.copy(stock, copy)
+    before = sha256(copy)
+    result = subprocess.run([sys.executable, str(ROOT / 'tools' / 'make_patch.py'), str(copy), str(copy), '--cvl'],
+                            capture_output=True, text=True)
+    assert result.returncode != 0 and 'Traceback' not in result.stderr
+    assert sha256(copy) == before
+
+
+def test_make_patch_usage_and_unknown_flag(tmp_path):
+    tool = str(ROOT / 'tools' / 'make_patch.py')
+    for argv in ([], ['--help'], ['a.s19', 'b.s19', '--cvl57']):
+        result = subprocess.run([sys.executable, tool, *argv], capture_output=True, text=True)
+        assert 'Traceback' not in result.stderr, argv
+        assert 'usage' in (result.stdout + result.stderr).lower(), argv
+    assert subprocess.run([sys.executable, tool, 'a.s19', 'b.s19', '--cvl57'], capture_output=True).returncode == 2

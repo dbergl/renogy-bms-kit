@@ -94,14 +94,17 @@ it. That is why reflashing has always recovered a bad application flash.
   GENERAL_RESET; see [the APS-500 guide](aps500-ws500.md).
 - Test new behavior with short leases first: a 30 s heater lease, a 60 s mask lease.
 
-## Flashing from Linux
+## Flashing from Linux (unsupported)
 
-There is no Linux port of either tool or of `ControlCAN.dll`, and the Windows tools don't work under Wine on
-ARM. The bootloader protocol is plain CAN at 250 kbit/s, though, so any SocketCAN adapter
-(`ip link set can0 up type can bitrate 250000`) can send identical frames.
-- **Record and replay** is the lowest-risk path: capture one real flash from the Windows tool with `candump -L` on
-  the same bus, including the button-timed entry, and replay its frames for your image.
-- **Reimplementing the protocol** in python-can is possible. The MFC tool's strings lay it out:
+These are research notes, not a supported path. There is no Linux port of either tool or of `ControlCAN.dll`,
+and the Windows tools don't work under Wine on ARM. The bootloader protocol is plain CAN at 250 kbit/s, so a
+SocketCAN adapter (`ip link set can0 up type can bitrate 250000`) can send the same frames.
+
+- **Replaying a capture only re-sends the image that was captured.** A `candump -L` of one real flash from the
+  Windows tool, including the button-timed entry, can be replayed to program **that same image again**, for
+  example stock. A capture can't flash a different image. Every other image needs its frames re-encoded, which
+  means reimplementing the protocol.
+- **Reimplementing the protocol** in python-can is possible but unverified. The MFC tool's strings lay it out:
   1. `Start Download`;
   2. the battery replies `Require data address`;
   3. 8-byte frames in 15-frame blocks;
@@ -110,3 +113,5 @@ ARM. The bootloader protocol is plain CAN at 250 kbit/s, though, so any SocketCA
 
   It is ACK-driven, with about 250 retries and per-phase timeouts. The address and data CAN IDs are operator
   settings in the tool's dialog, so take them from a capture.
+
+For recovery, use Renogy's Windows tools as described above.

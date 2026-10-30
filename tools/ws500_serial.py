@@ -10,9 +10,10 @@ Read-only commands, safe at any time:
     $RCP:0   request the currently selected charge profile
     $RLF:    request the last fault
 
-Anything starting $SC, $CP, $CNG, $MSR, $RBT, $DEP, $CCN or $CDD WRITES
-CONFIGURATION or reboots the regulator. This script refuses those unless
---allow-write is given, because the regulator controls live alternator charging.
+Only $R... commands (other than $RBT, which reboots) are read-only. Everything
+else, including $SC..., $CP..., $CNG, $MSR and any command this script doesn't
+know, may WRITE CONFIGURATION or reboot the regulator, so it is refused unless
+--allow-write is given: the regulator controls live alternator charging.
 
     python tools/ws500_serial.py --port COM5                  # watch AST; for 6 s (Windows)
     python tools/ws500_serial.py --seconds 20 --ast-only      # Linux: the by-id port is found itself
@@ -26,12 +27,12 @@ import sys
 import time
 
 BAUD = 115200
-WRITE_PREFIXES = ('$SC', '$CP', '$CNG', '$MSR', '$RBT', '$DEP', '$CCN', '$CDD')
 
 
-def looks_like_write(cmd: str) -> bool:
+def is_read_only(cmd: str) -> bool:
+    """An allowlist: $R... requests, except $RBT (reboot). Anything else may write."""
     up = cmd.strip().upper()
-    return any(up.startswith(p) for p in WRITE_PREFIXES)
+    return up.startswith('$R') and not up.startswith('$RBT')
 
 
 def default_port() -> str | None:
@@ -76,8 +77,9 @@ def main() -> int:
     args = ap.parse_args()
 
     for c in args.cmds:
-        if looks_like_write(c) and not args.allow_write:
-            print(f'refusing to send {c!r} without --allow-write: it changes regulator configuration or reboots it')
+        if not is_read_only(c) and not args.allow_write:
+            print(f'refusing to send {c!r} without --allow-write: only $R... requests (not $RBT) are known to be '
+                  'read-only; anything else may change regulator configuration or reboot it')
             return 2
     if not args.port:
         ap.error('--port is required on this platform (e.g. --port COM5)')

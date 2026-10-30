@@ -84,7 +84,7 @@ with `tools/make_patch.py` and its flags, or by changing it.
 | `tools/audit_image.py` | Lists every byte range an image changes, and flags anything a recipe doesn't produce |
 | `tools/run_emulator_tests.py` | Runs the Ghidra emulator tests for a recipe or your own image |
 | `tools/rvc_command.py` | Sends the heater and mask commands, decodes the status broadcast (python-can) |
-| `tools/ws500_serial.py` | Reads and queries the APS-500 over USB serial; refuses config writes without `--allow-write` |
+| `tools/ws500_serial.py` | Reads and queries the APS-500 over USB serial; sends only `$R…` requests without `--allow-write` |
 | `tools/gen_reference.py` | Regenerates the function reference from `markup/` |
 
 Tests: `pytest`. Tests that need firmware or Ghidra skip unless `RENOGY_STOCK_S19` and `GHIDRA_HOME` are set.

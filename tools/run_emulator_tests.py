@@ -134,33 +134,41 @@ def main() -> int:
                                 ['-import', str(renamed), '-overwrite', '-noanalysis',
                                  '-loader', 'MotorolaHexLoader', '-processor', 'HCS-12X:BE:24:default',
                                  '-cspec', 'default'], args.work / 'import.log')
-    except (ValueError, ghidra_run.ProjectLocked) as e:
+    except (ValueError, OSError, ghidra_run.ProjectLocked, build_recipe.RecipeMismatch) as e:
         print(f'error: {e}')
         return 1
     if result.returncode != 0:
         print(f'error: import failed; see {args.work / "import.log"}')
         return 1
 
-    failures = 0
-    for recipe in [args.recipe] if args.recipe else list(tests):
-        image = images.own(args.image) if args.image else images.recipe(recipe)
-        for test in tests[recipe]:
-            script = test['script']
-            if 'image_flags' in test:
-                if args.image:
-                    print(f'SKIP {script} ({recipe}): it runs on {test["note"]}, not on your image')
-                    continue
-                target = images.variant(test['image_flags'])
-            else:
-                target = image
-            log = args.work / f'{recipe}-{Path(script).stem}.log'
-            run = ghidra_run.run(args.ghidra, args.work, PROJECT,
-                                 ['-process', HOST_PROGRAM, '-readOnly', '-noanalysis',
-                                  '-scriptPath', str(ghidra_run.KIT_GHIDRA_SCRIPTS),
-                                  '-postScript', script, *substitute(test['args'], target, images)], log)
-            ok = passed(run.stdout + run.stderr, script, test['expect'])
-            failures += not ok
-            print(f'{"PASS" if ok else "FAIL"} {script} ({recipe}){"" if ok else f"; see {log}"}', flush=True)
+    failures, untested = 0, []
+    try:
+        for recipe in [args.recipe] if args.recipe else list(tests):
+            image = images.own(args.image) if args.image else images.recipe(recipe)
+            for test in tests[recipe]:
+                script = test['script']
+                if 'image_flags' in test:
+                    if args.image:
+                        untested.append(f'{script} ({recipe}): it runs only on {test["note"]}')
+                        print(f'NOT TESTED {script} ({recipe}): it runs only on {test["note"]}, not on your image')
+                        continue
+                    target = images.variant(test['image_flags'])
+                else:
+                    target = image
+                log = args.work / f'{recipe}-{Path(script).stem}.log'
+                run = ghidra_run.run(args.ghidra, args.work, PROJECT,
+                                     ['-process', HOST_PROGRAM, '-readOnly', '-noanalysis',
+                                      '-scriptPath', str(ghidra_run.KIT_GHIDRA_SCRIPTS),
+                                      '-postScript', script, *substitute(test['args'], target, images)], log)
+                ok = passed(run.stdout + run.stderr, script, test['expect'])
+                failures += not ok
+                print(f'{"PASS" if ok else "FAIL"} {script} ({recipe}){"" if ok else f"; see {log}"}', flush=True)
+    except (ValueError, OSError, ghidra_run.ProjectLocked, build_recipe.RecipeMismatch) as e:
+        print(f'error: {e}')
+        return 1
+    if untested:
+        print(f'{len(untested)} test(s) NOT run on your image; write a harness for those features '
+              '(docs/emulator-testing.md)')
     return 1 if failures else 0
 
 

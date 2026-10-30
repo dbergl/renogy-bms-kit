@@ -57,7 +57,7 @@ def test_no_legacy_option():
     assert '--legacy' not in result.stdout and '999' not in result.stdout
 
 
-@pytest.mark.parametrize('cmd', ['$SCV:...', '$cp:1', '$RBT:'])
+@pytest.mark.parametrize('cmd', ['$SCV:...', '$cp:1', '$RBT:', '$XYZ:', 'hello'])
 def test_ws500_write_refused_before_opening_port(cmd, tmp_path):
     missing = tmp_path / 'no-such-port'
     result = subprocess.run([sys.executable, str(TOOLS / 'ws500_serial.py'), '--port', str(missing), cmd],
@@ -68,8 +68,10 @@ def test_ws500_write_refused_before_opening_port(cmd, tmp_path):
 
 
 def test_ws500_read_commands_allowed():
-    assert not ws500_serial.looks_like_write('$RAS:')
-    assert ws500_serial.looks_like_write('$SCV:52.0')
+    for cmd in ('$RAS:', '$RCP:0', '$RLF:', '$ras:'):
+        assert ws500_serial.is_read_only(cmd), cmd
+    for cmd in ('$SCV:52.0', '$RBT:', '$XYZ:', '$CPE:1', ''):
+        assert not ws500_serial.is_read_only(cmd), cmd
 
 
 def test_ws500_port_required_off_linux(monkeypatch):

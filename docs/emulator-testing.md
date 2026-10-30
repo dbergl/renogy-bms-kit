@@ -32,9 +32,16 @@ python tools/run_emulator_tests.py --ghidra <Ghidra folder> --stock <stock.s19> 
 
 What the runner does:
 
-1. Builds every image the tests need into `--work` with [`tools/build_recipe.py`](../tools/build_recipe.py)
-   (each one must match its published SHA-256) and converts each to the global layout with
+1. Builds every image the tests need into `--work` and converts each to the global layout with
    [`tools/to_global.py`](../tools/to_global.py).
+   - Recipe images are built with [`tools/build_recipe.py`](../tools/build_recipe.py), so each must match its
+     published SHA-256.
+   - A test with `image_flags` in `tests.json` runs instead on a [`tools/make_patch.py`](../tools/make_patch.py)
+     build with those flags. That build is not a published recipe and has no published hash.
+   - `UvChargeTest` is the one such test. It runs on the `uvcharge` recipe built **without `--diffmask`**,
+     because its byte check accepts only the UV-charge bytes on top of `slew256`. The UV bytes are identical to
+     the recipe's. `Can1MaskTest` covers the one diffmask byte on the real recipe image, and
+     [`tools/audit_image.py`](../tools/audit_image.py) shows the two images differ by exactly that byte.
 2. Imports the `rvc_status` image into a fresh Ghidra project (named emulator\_tests) in `--work`. That program is only a
    host: every test loads the image it is given into a read-only transaction, so a stale project can never
    test old bytes.
@@ -52,6 +59,10 @@ bytes, so an image that differs from the recipe fails at the first identity chec
 That is the expected result for your own patch: it tells you the recipe's tests no longer describe your
 image, and you need a test of your own (below).
 
+Tests with `image_flags` are **not run** on your image. The runner prints `NOT TESTED UvChargeTest.java …` and
+a closing count of the tests it didn't run. So `--recipe uvcharge --image my.s19` does **not** emulate the UV
+charging logic on your image. Write a harness for it.
+
 Tokens in `tests.json` arguments: `{image}` is the image under test (global layout), `{stock}` the stock
 global image, `{base:NAME}` another recipe's global image.
 
@@ -65,7 +76,7 @@ global image, `{base:NAME}` another recipe's global image.
 | `rvc_status` | [`HeaterStatusTxTest`](../ghidra/HeaterStatusTxTest.java) | image, stock | The 0x18FF7070 status broadcast: a 2 s cadence in every relay/state combination; exactly one acknowledgement per accepted command and none for dispatcher-rejected frames; the lease field is the live PIT countdown; a full transmit buffer drops a heartbeat, never an acknowledgement; register poll replies are byte-identical with the broadcast interleaved; both main-loop splices still execute the stock call they displaced; stack depth measured against the stock transmitter. |
 | `cvl` | [`CvlSettingTest`](../ghidra/CvlSettingTest.java) | image, stock, `{base:rvc_status}`, `max=570` | The image is the `rvc_status` image plus three splices and `FE:BFE0–BFFF`; the charge voltage limit routine over all 65,536 IR3 values (52.0–57.0 V passes, anything else gives stock 54.7 V) writes nothing outside the stack; the "full" comparison equals the stock `CPD` against limit − 0.1 V for all 65,536 D values; registers 0x138F, 0x1391 and the `soc_calc` full rule follow IR3. `max=570` matches a `--cvl570` build. See [charge-limits.md](charge-limits.md). |
 | `slew256` | [`ChargeSlewTest`](../ghidra/ChargeSlewTest.java) | image, stock, `{base:cvl}`, `256` | The image is the `cvl` image plus one splice at `FE:A96E` and `0x57E0–0x57FF`; every previous value × every taper output matches the model; through the real selection block, steady state equals stock, falls are limited to 1/256 per pass from the 90 A clamp, zero and rises pass at once. `256` selects the rate (`128` for a `--slew` build). |
-| `uvcharge` | [`UvChargeTest`](../ghidra/UvChargeTest.java) | image, stock, `{base:slew256}` | The image is the `slew256` image plus splices at `FE:A96C`, `FE:AC0A`, `0x500C` and `FC:B780–B7FF`; the register copy hides the undervoltage bits until a PA1 cut is near, against the real builder for every word value; the 42 A / 21 A caps; real main-loop passes in scheduler order show the warning reaching the bus before PA1 opens, for cell and pack, including the charge-mode exit under load; the CAN4 0x100 work-mode byte is ignored while an L3 countdown runs. |
+| `uvcharge` | [`UvChargeTest`](../ghidra/UvChargeTest.java) | the recipe without `--diffmask` (`image_flags`), stock, `{base:slew256}` | The image is the `slew256` image plus splices at `FE:A96C`, `FE:AC0A`, `0x500C` and `FC:B780–B7FF`; the register copy hides the undervoltage bits until a PA1 cut is near, against the real builder for every word value; the 42 A / 21 A caps; real main-loop passes in scheduler order show the warning reaching the bus before PA1 opens, for cell and pack, including the charge-mode exit under load; the CAN4 0x100 work-mode byte is ignored while an L3 countdown runs. |
 | `uvcharge` | [`Can1MaskTest`](../ghidra/Can1MaskTest.java) | image, stock, `16`, `--copy-only` | As above, with the `--diffmask` 1392 low-byte mask `16`, which also hides the difference L1 bits. |
 
 ### The `--copy-only` rule

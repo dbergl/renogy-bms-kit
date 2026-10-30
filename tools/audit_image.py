@@ -58,6 +58,7 @@ class Report(NamedTuple):
     size: int
     size_ok: bool
     changed: list[tuple[int, int, str]]
+    warnings: list[str] = []
 
 
 def memory(path: Path) -> dict[int, int]:
@@ -81,26 +82,36 @@ def region(address: int) -> str | None:
     return None
 
 
-def reviewed_values(stock: Path) -> dict[int, set[int]]:
-    """Every byte value the published recipes place at each changed address."""
+def reviewed_values(stock: Path) -> tuple[dict[int, set[int]], list[str]]:
+    """Every byte value the published recipes place at each changed address.
+
+    A recipe that tools/make_patch.py no longer reproduces (because it was edited)
+    contributes nothing, and is named in the returned warnings.
+    """
     values: dict[int, set[int]] = {}
+    warnings: list[str] = []
     base = memory(stock)
     with tempfile.TemporaryDirectory() as d:
         for name in build_recipe.load_recipes():
             out = Path(d) / f'{name}.s19'
-            with contextlib.redirect_stdout(io.StringIO()):
-                build_recipe.build(stock, name, out)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    build_recipe.build(stock, name, out)
+            except build_recipe.RecipeMismatch:
+                warnings.append(f'tools/make_patch.py no longer reproduces recipe {name}; '
+                                'its bytes are not treated as reviewed')
+                continue
             for a, v in memory(out).items():
                 if base.get(a) != v:
                     values.setdefault(a, set()).add(v)
-    return values
+    return values, warnings
 
 
 def audit(stock: Path, image: Path) -> Report:
     digest = hashlib.sha256(Path(image).read_bytes()).hexdigest()
     recipe = next((r.name for r in build_recipe.load_recipes().values() if r.sha256 == digest), None)
     base, new = memory(stock), memory(image)
-    reviewed = reviewed_values(stock)
+    reviewed, warnings = reviewed_values(stock)
     changed: list[tuple[int, int, str]] = []
     for a in sorted(set(base) | set(new)):
         if base.get(a) == new.get(a):
@@ -113,7 +124,7 @@ def audit(stock: Path, image: Path) -> Report:
         else:
             changed.append((a, a + 1, label))
     size = programmed_bytes(image)
-    return Report(recipe, size, size <= MAX_IMAGE_BYTES, changed)
+    return Report(recipe, size, size <= MAX_IMAGE_BYTES, changed, warnings)
 
 
 def main() -> int:
@@ -125,6 +136,8 @@ def main() -> int:
     except ValueError as e:
         print(f'error: {e}')
         return 1
+    for w in report.warnings:
+        print(f'warning: {w}')
     print(f'{sys.argv[2]}: ' + (f'recipe {report.recipe}' if report.recipe else 'not a published recipe'))
     print(f'size: {report.size} programmed bytes, cap {MAX_IMAGE_BYTES}: ' + ('ok' if report.size_ok else 'OVER THE CAP'))
     for start, end, label in report.changed:

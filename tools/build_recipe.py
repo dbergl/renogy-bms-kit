@@ -10,6 +10,7 @@ your own variant, call tools/make_patch.py with your own flags, or change it.
 """
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -53,15 +54,22 @@ def build(stock: Path, name: str, out: Path) -> str:
     if not ok:
         raise ValueError(reason)
     flags = recipes[name].flags
-    make_patch.build(stock, out,
-                     with_cvl='--cvl' in flags,
-                     with_slew=256 if '--slew256' in flags else 128 if '--slew' in flags else 0,
-                     with_uv='--uvcharge' in flags,
-                     with_diffmask='--diffmask' in flags,
-                     cvl_max=make_patch.CVL_MAX_570 if '--cvl570' in flags else make_patch.CVL_MAX)
-    actual = hashlib.sha256(out.read_bytes()).hexdigest()
-    if actual != recipes[name].sha256:
-        raise RecipeMismatch(name, recipes[name].sha256, actual)
+    # Build beside the output and move it into place only if it matches, so a
+    # mismatch never leaves a flashable wrong image under the recipe's name.
+    tmp = out.with_name(out.name + '.building')
+    try:
+        make_patch.build(stock, tmp,
+                         with_cvl='--cvl' in flags,
+                         with_slew=256 if '--slew256' in flags else 128 if '--slew' in flags else 0,
+                         with_uv='--uvcharge' in flags,
+                         with_diffmask='--diffmask' in flags,
+                         cvl_max=make_patch.CVL_MAX_570 if '--cvl570' in flags else make_patch.CVL_MAX)
+        actual = hashlib.sha256(tmp.read_bytes()).hexdigest()
+        if actual != recipes[name].sha256:
+            raise RecipeMismatch(name, recipes[name].sha256, actual)
+        os.replace(tmp, out)
+    finally:
+        tmp.unlink(missing_ok=True)
     return actual
 
 

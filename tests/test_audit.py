@@ -91,3 +91,15 @@ def test_cli_reports_recipe(stock, built):
     assert result.returncode == 0, result.stdout
     assert 'recipe cvl' in result.stdout and '0 unreviewed bytes' in result.stdout
     assert 'Patched' not in result.stdout
+
+
+def test_audit_survives_a_changed_make_patch(stock, built, monkeypatch, capsys):
+    # A user who edits make_patch.py breaks every recipe rebuild; the audit must still report.
+    real = build_recipe.load_recipes
+
+    def wrong_hashes():
+        return {n: r._replace(sha256='0' * 64) for n, r in real().items()}
+    monkeypatch.setattr(build_recipe, 'load_recipes', wrong_hashes)
+    report = audit_image.audit(stock, built['cvl'])
+    assert report.changed and all(label == 'unreviewed' for _, _, label in report.changed)
+    assert any('no longer reproduces' in w for w in report.warnings)

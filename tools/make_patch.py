@@ -811,9 +811,22 @@ def build(src, dst, with_cvl=False, with_slew=False, with_uv=False, with_diffmas
 
 
 if __name__ == '__main__':
-    flags = ('--cvl', '--cvl570', '--slew', '--slew256', '--uvcharge', '--diffmask')
-    args = [a for a in sys.argv[1:] if a not in flags]
-    rate = 256 if '--slew256' in sys.argv[1:] else 128 if '--slew' in sys.argv[1:] else 0
-    build(*args, with_cvl='--cvl' in sys.argv[1:], with_slew=rate,
-          with_uv='--uvcharge' in sys.argv[1:], with_diffmask='--diffmask' in sys.argv[1:],
-          cvl_max=CVL_MAX_570 if '--cvl570' in sys.argv[1:] else CVL_MAX)
+    import argparse
+    p = argparse.ArgumentParser(allow_abbrev=False, description='Build a patched V137.4.5 image from the exact stock file. '
+                                'The published combinations are in recipes/recipes.json (tools/build_recipe.py).')
+    p.add_argument('stock', help="Renogy's stock V137.4.5[20240719a].s19")
+    p.add_argument('out', help='the patched .s19 to write')
+    p.add_argument('--cvl', action='store_true', help='charge voltage limit from IR3 (52.0-56.0 V)')
+    p.add_argument('--cvl570', action='store_true', help='with --cvl: raise the ceiling to 57.0 V')
+    p.add_argument('--slew', action='store_true', help='charge current slew, 1/128 per pass')
+    p.add_argument('--slew256', action='store_true', help='charge current slew, 1/256 per pass')
+    p.add_argument('--uvcharge', action='store_true', help='undervoltage charging (needs a slew flag)')
+    p.add_argument('--diffmask', action='store_true', help='mask lease also hides the difference L1 alarms')
+    a = p.parse_args()
+    if Path(a.out).resolve() == Path(a.stock).resolve():
+        p.error('the output would overwrite your stock file; choose another file name')
+    try:
+        build(a.stock, a.out, with_cvl=a.cvl, with_slew=256 if a.slew256 else 128 if a.slew else 0,
+              with_uv=a.uvcharge, with_diffmask=a.diffmask, cvl_max=CVL_MAX_570 if a.cvl570 else CVL_MAX)
+    except (ValueError, OSError) as e:
+        sys.exit(f'error: {e}')
