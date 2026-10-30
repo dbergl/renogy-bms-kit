@@ -43,13 +43,17 @@ def run(ghidra_home: Path, project_dir: Path, project_name: str, args: list[str]
     """analyzeHeadless <project_dir> <project_name> <args...>, arguments passed as a list (no shell)."""
     headless = find_headless(ghidra_home)
     project_dir = Path(project_dir)
-    lock = project_dir / f'{project_name}.lock'
-    if lock.exists():
-        raise ProjectLocked(f'{lock} exists: Ghidra is open on this project, or closed without cleaning up. '
-                            'Close Ghidra; if it is not running, delete the .lock file.')
     project_dir.mkdir(parents=True, exist_ok=True)
     result = subprocess.run([str(headless), str(project_dir), project_name, *args],
                             capture_output=True, text=True, errors='replace')
     if log:
         Path(log).write_text(result.stdout + result.stderr)
+    if is_locked(result.stdout + result.stderr):
+        # Ghidra leaves a .lock file behind after every run; only a live holder refuses.
+        raise ProjectLocked(f'Ghidra is open on the project {project_dir / project_name}. '
+                            'Close that Ghidra window (or wait for the other run) and try again.')
     return result
+
+
+def is_locked(output: str) -> bool:
+    return 'Unable to lock project' in output or 'Project is locked' in output

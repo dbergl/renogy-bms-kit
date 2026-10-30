@@ -31,9 +31,30 @@ def test_missing_ghidra_names_expected_path(tmp_path):
     assert 'support/analyzeHeadless' in result.stdout + result.stderr
 
 
-def test_locked_project_refused(ghidra_home, stock, tmp_path):
-    (tmp_path / 'renogy_bms.lock').write_text('')
-    result = run_setup(ghidra_home, stock, tmp_path)
+def test_lock_message_detected():
+    import ghidra_run
+    assert ghidra_run.is_locked('ERROR Unable to lock project! /x/renogy_bms (HeadlessAnalyzer)')
+    assert not ghidra_run.is_locked('INFO  REPORT: Import succeeded')
+
+
+@pytest.mark.ghidra
+def test_project_held_open_is_refused(ghidra_home, stock, tmp_path):
+    import time
+    first = run_setup(ghidra_home, stock, tmp_path)
+    assert first.returncode == 0, first.stdout[-2000:]
+    import ghidra_run
+    holder = subprocess.Popen([str(ghidra_run.find_headless(ghidra_home)), str(tmp_path), 'renogy_bms',
+                               '-process', 'stock_global.s19', '-noanalysis', '-readOnly',
+                               '-scriptPath', str(ROOT / 'tests' / 'ghidra'), '-postScript', 'HoldProject.java', '30'],
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        for line in holder.stdout:
+            if 'HOLDING' in line:
+                break
+        result = run_setup(ghidra_home, stock, tmp_path)
+    finally:
+        holder.kill()
+        holder.wait()
     assert result.returncode == 1
     assert 'Ghidra is open' in result.stdout + result.stderr
 

@@ -1,0 +1,90 @@
+{
+  "_comment": "Emulator tests per recipe. Tokens: {image} = the image under test, {stock} = stock global, {base:NAME} = another recipe's global. 'expect' is the line the harness prints when every check passed. 'image_flags' runs the test on a make_patch.py build with those flags instead of the recipe, because the harness's byte check accepts only that feature's own bytes.",
+  "rvc_status": [
+    {
+      "script": "ReviewHeaterTest.java",
+      "args": [
+        "{image}"
+      ],
+      "expect": "IN-PLACE ALL FOUR FIXES: ACCEPTANCE PASSED"
+    },
+    {
+      "script": "Can1MaskTest.java",
+      "args": [
+        "{image}",
+        "{stock}",
+        "3E",
+        "--copy-only"
+      ],
+      "expect": "CAN1 MASK COPY ACCEPTANCE PASSED"
+    },
+    {
+      "script": "Can1BusyReleaseTest.java",
+      "args": [
+        "{image}",
+        "{stock}"
+      ],
+      "expect": "CAN1 BUSY RELEASE ACCEPTANCE PASSED"
+    },
+    {
+      "script": "HeaterStatusTxTest.java",
+      "args": [
+        "{image}",
+        "{stock}"
+      ],
+      "expect": "STATUS BROADCAST ACCEPTANCE PASSED"
+    }
+  ],
+  "cvl": [
+    {
+      "script": "CvlSettingTest.java",
+      "args": [
+        "{image}",
+        "{stock}",
+        "{base:rvc_status}",
+        "max=570"
+      ],
+      "expect": "CVL SETTING PASSED"
+    }
+  ],
+  "slew256": [
+    {
+      "script": "ChargeSlewTest.java",
+      "args": [
+        "{image}",
+        "{stock}",
+        "{base:cvl}",
+        "256"
+      ],
+      "expect": "CHARGE SLEW PASSED"
+    }
+  ],
+  "uvcharge": [
+    {
+      "script": "UvChargeTest.java",
+      "args": [
+        "{image}",
+        "{stock}",
+        "{base:slew256}"
+      ],
+      "expect": "UV CHARGE PASSED",
+      "image_flags": [
+        "--cvl",
+        "--cvl570",
+        "--slew256",
+        "--uvcharge"
+      ],
+      "note": "the uvcharge recipe without --diffmask; its UV bytes are identical, and Can1MaskTest covers the diffmask byte"
+    },
+    {
+      "script": "Can1MaskTest.java",
+      "args": [
+        "{image}",
+        "{stock}",
+        "16",
+        "--copy-only"
+      ],
+      "expect": "CAN1 MASK COPY ACCEPTANCE PASSED"
+    }
+  ]
+}
