@@ -87,7 +87,7 @@ Trip and release delays are in 100 ms main-task passes; "1 s" is 10 consecutive 
 | High temperature, charging | 50 / 55 / 57 °C | L2 held 5 s | L3 held 1 s |
 | High temperature, discharging | 55 / 60 / 62 °C | L2 held 5 s | L3 held 1 s |
 | Low temperature, discharging | −10 / −20 / −30 °C | L2 held 5 s | L3 held 1 s |
-| Low temperature, charging | 5 / 0 / −10 °C | driven by the heater logic | driven by the heater logic |
+| Low temperature, charging | 5 / 0 / −10 °C | driven by the heater logic, or at once (below) | driven by the heater logic |
 | Cell / temperature difference | 500 / 800 mV; 15 / 20 °C | no | no |
 | SoC low | 20 / 10 % | no | no |
 
@@ -109,12 +109,22 @@ trips. This is stock behaviour.
 | PA1 cut request | 10 s at L3 | 10 s at L3 |
 | L3 releases | `cvol_l3` + 150 mV for 1 s, charge mode only | `tvol_l3` + 2.4 V for 1 s, charge mode only |
 
-- **Charge mode holds PA1 closed for up to 300 s.** In charge mode (at least 1 A of charge for 3 s,
-  detected by `mode_detect_chg_dch`) `alarm_post_adjust` clears the PA1 cut bit every pass for up to
+- **Charge mode holds PA1 closed for up to 300 s.** In charge mode (with PA1 closed, at least 1 A of charge for
+  3.1 s, detected by `mode_detect_chg_dch`) `alarm_post_adjust` clears the PA1 cut bit every pass for up to
   3000 passes, so a charging pack can recover. The hold ends early as soon as the mode leaves 1, which
-  happens after 3 s of at least 1 A net discharge, or when a CAN4 0x100 frame writes the work mode.
-  PA1 then opens in the same pass.
+  happens after 3.1 s of at least 1 A net discharge, or when a CAN4 0x100 frame writes the work mode.
+  PA1 then opens in the same pass. A 0x100 write of mode 0 is worse: it stops the alarm evaluators and
+  relay updates altogether ([can-protocol.md](can-protocol.md)).
+- **Entering charge mode can open PA1 with no warning.** When the work mode changes,
+  `alarm_temp_eval_all` re-seeds the temperature alarms with no debounce. Entering charge mode with the
+  hottest probe above `ch_temp_h2` sets the charge high-temperature L2 and the PA1 cut at once; entering
+  it with the coldest probe below `ch_temp_l3` sets charge low-temperature L3 and the PA1 cut at once, and
+  that cut stays latched for as long as the mode stays 1. No L2 report precedes either.
 - **At L3 SoC is reset to 0 %.**
+- **PA2 at cell UV L3 depends on the mode.** The 5 s shed applies in discharge mode, or in charge mode
+  while the charge low-temperature level is 1 or less. In charge mode at low-temp L2/L3 (or in mode 0)
+  PA2 is shed only after PA1 has opened, and then only once the lowest cell is under 2600 mV for 1 s or
+  more than 1 A of discharge flows for 2 s. The pack UV L3 shed is unconditional after 5 s.
 - **The DC-DC lockout is persistent.** It is bit 0 of RAM 0x25C3, saved in the external-memory record
   at 0x25C0. PA2 stays off until SoC is at least 20 % and the lowest cell is at least 3.300 V, across
   reboots.

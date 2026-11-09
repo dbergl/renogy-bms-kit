@@ -43,14 +43,21 @@ sets SoC to 100 % and the SoC-full flag (bit 1 of RAM 0x2624) by three routes:
 | Cell rules | SoC > 80 % and less than 1.0 A of discharge, with the highest cell at 3.400 V (charge under 1.5 A, 10 min), 3.450 V (under 3 A, 5 min), 3.500 V (under 5 A, 2 min) or 3.530 V (under 5 A, 5 s) |
 | Overvoltage | a cell or pack OV L3 alarm, at once |
 
+A fifth cell tier (above 3.550 V, any current, 5 s) never fires on its own: a stock bug increments the
+3.530 V tier's counter instead of its own, so above 3.550 V with under 5 A of charge the 3.530 V tier
+fires after about 2.6 s.
+
 While the SoC-full flag is set the published current limit is 0 A, which stops the charger. The flag
-clears after 120 s of at least 1.5 A discharge.
+clears when the highest cell is below 3.350 V for 1 s, after 10 s of at least 5 A discharge, or after
+120 s of at least 1.5 A discharge. In the other direction, any cell or pack UV L3 sets SoC to 0 % and
+clears the flag.
 
 If the limit moved below 54.6 V with the threshold left at stock, the charger-full rule could never fire
 and SoC would drift charge after charge. That is why the patch moves both together.
 
-The averaged current the BMS uses here (RAM 0x22A6) is negative while charging. `g_current_float`
-(0x261A), used by heater supervision, has the opposite sign.
+The averaged current the BMS uses here (RAM 0x22A6) is negative while charging. Don't confuse it with
+`g_pa1_side_volt` (0x261A), which heater supervision uses: that is a voltage, the charger side of PA1,
+not a current.
 
 ### IR3 sets the limit (recipes `cvl`, `slew256`, `uvcharge`)
 
@@ -139,8 +146,14 @@ The pack is 16s2p of 105 Ah cells (210 Ah). The 54.7 V limit, 105 A maximum, 4.2
 0–55 °C window and the 20 A cold current match Renogy's published specification; the cell-voltage steps
 are not published.
 
-The ladder reads the highest cell through an asymmetric peak-hold: while charging the held value rises
-at once and falls only when the cell drops 30 mV or more below it, or after 3000 passes (300 s).
+The ladder reads the highest cell through an asymmetric peak-hold. While charging, the held value rises
+at once and falls at once when the cell drops 30 mV or more below it. A smaller drop is taken only when a
+counter reaches 3000 passes (300 s). That counter counts passes spent 1–29 mV below the held value; an
+exact match resets it, a new peak does not, so with noisy readings the release can come early or not at
+all. In other work modes the hold follows the cell at once only while discharging at 2.5 A or more;
+otherwise every change, a rise included, waits for the same counter. The temperature gates read the
+minimum temperature through a similar hold (1.0 °C band, 50 s), so a slow fall through 5 °C or 0 °C can
+be seen up to about 50 s late.
 
 | Constant | Address | Stock bytes |
 |---|---|---|

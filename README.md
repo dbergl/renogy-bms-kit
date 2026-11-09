@@ -86,6 +86,7 @@ with `tools/make_patch.py` and its flags, or by changing it.
 | `tools/rvc_command.py` | Sends the heater and mask commands, decodes the status broadcast (python-can) |
 | `tools/ws500_serial.py` | Reads and queries the APS-500 over USB serial; sends only `$R…` requests without `--allow-write` |
 | `tools/gen_reference.py` | Regenerates the function reference from `markup/` |
+| `tools/fix_ghidra.py` | Builds a Ghidra copy whose HCS12 decompiler reads this firmware's branches correctly |
 
 Tests: `pytest`. Tests that need firmware or Ghidra skip unless `RENOGY_STOCK_S19` and `GHIDRA_HOME` are set.
 

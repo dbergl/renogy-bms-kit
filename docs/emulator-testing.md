@@ -115,10 +115,10 @@ changed to work around them; the harness corrects the emulator.
 | Quirk | Effect | Correction |
 |---|---|---|
 | BGE / LBGE (`2C`, `18 2C`) | Branch condition reversed. The correct rule (NXP HCS12 core guide) is branch iff N xor V = 0. | `VerifiedHeaterHarness.step()` computes the right next PC from the pre-instruction CCR and overrides PC. |
-| BRSET (direct, extended, indexed forms) | Branch sense wrong. The decompiler shows the same inversion, so read `BRSET` tests in the listing, not the decompiler. | `VerifiedHeaterHarness` decodes each addressing form, reads the operand and sets PC; an addressing form it does not know fails the test instead of guessing. |
+| BRSET (direct, extended, indexed forms) | Branch sense wrong. Stock Ghidra's decompiler shows the same inversion; [`tools/fix_ghidra.py`](../tools/fix_ghidra.py) builds a corrected copy for decompiling (see [the walkthrough](ghidra-walkthrough.md)). | `VerifiedHeaterHarness` decodes each addressing form, reads the operand and sets PC; an addressing form it does not know fails the test instead of guessing. |
 | Paging (`segment` p-code op) | Not implemented by the emulator. | `EmuHeaterTest.setup()` maps local addresses to global ones using PPAGE/RPAGE. |
 | `LDS` (`LoadStack` p-code op) | Not implemented. | `VerifiedHeaterHarness.setup()` supplies it. |
-| CPEX | Z flag not sticky, which breaks the stock 32-bit ID compare (`rt_lcmp`). | `EmuHeaterTest.step()` restores sticky Z after that instruction. |
+| CPEX / CPED | Z flag not sticky, which breaks the stock 32-bit ID compare (`rt_lcmp`). C and V also ignore the borrow from the low word. | `EmuHeaterTest.step()` restores sticky Z after the `rt_lcmp` CPEX. The borrow is **not** corrected: an unsigned 32-bit compare whose high words are equal (the scheduler's `rt_lcmp` followed by `BCS`/`BHI`/`LBLS`, and the 0x7FF standard/extended test in `can_tx` at `7F8BC1`) still gets the stock model's answer. |
 | RTI | Modelled as CPU12, not CPU12X, so the stacked frame differs. | Interrupt fixtures stop before RTI and restore the interrupted registers explicitly. |
 | 16-bit PC after a far jump | PC can hold the low half of a global address. | `step()` maps it back to the global address. |
 | `writeMemory` of a buffer of 4 KB or more | The emulator adopts the caller's array as its memory instead of copying it, so later emulated stores change the caller's array. | Restore RAM baselines in chunks under 4 KB (the tests use 256 bytes) and read them back. |

@@ -89,10 +89,38 @@ Things that trip people up:
 
 - **Banked vs. global addresses.** Code calls `JSR 0x4E27` (a local address). In Ghidra that is global
   `0x7F4E27`. RAM operands like `0x2350` refer to `0x0FE350`.
-- **The decompiler mis-reads some HCS12X instructions.** Extended `BRSET`/`BRCLR` conditions and the long
-  signed branches can come out inverted. When a condition matters, read the instruction in the Listing.
-  [Emulator testing](emulator-testing.md) has the details.
+- **Stock Ghidra's decompiler gets conditions wrong on this target.** Its HCS12 language inverts every
+  `BRSET` (`BRCLR` is right) and `BGE`/`LBGE` (they act as `BLT`), and its `CPED`/`CPEX` lose the sticky Z
+  and the borrow, which breaks 32-bit compares. Separately, the runtime helpers `rt_fcmp`, `rt_lcmp` and the
+  double compare at `7F4370` return their result in the condition codes, which the decompiler can't see: it
+  prints a test of stale flags, and sometimes drops a branch. About 60 functions are affected, the heater,
+  mode detection and SoC code among them. Use the corrected decompiler below, and when a condition
+  matters, check the instruction in the Listing.
 - **Calls through the switch helper at `0x4A70`** are switch statements; `FixupDisasm.java` labels their cases.
+
+### A corrected decompiler
+
+[`tools/fix_ghidra.py`](../tools/fix_ghidra.py) builds a second Ghidra install with the HCS12 language
+fixed. It is a hard-linked copy, so it costs almost no space, and your original install is not changed:
+keep using the original for the [emulator tests](emulator-testing.md), whose harness corrects the stock
+model itself.
+
+```
+python tools/fix_ghidra.py --ghidra <your Ghidra folder> --out <new folder>
+```
+
+Open your project in the new install to browse with correct conditions. To also see the helper
+comparisons as real compares (`if (-10.0 <= current)`), export with
+[`ghidra/ExportFixedDecomp.java`](../ghidra/ExportFixedDecomp.java), which replaces the three helpers with
+p-code call fixups in a read-only session:
+
+```
+<new folder>/support/analyzeHeadless <project folder> renogy_bms -process stock_global.s19 \
+  -readOnly -noanalysis -scriptPath ghidra -postScript ExportFixedDecomp.java <output folder>
+```
+
+Add function names after the output folder to export only those. The output is decompiled firmware:
+keep it on your machine and never commit it.
 
 ## 5. Making a patch
 

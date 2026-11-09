@@ -57,7 +57,7 @@ address	name	kind	summary
 0fe5e4	g_cell_max_mV	ram	Highest cell voltage, mV (word); the cell index follows at 0x25E6.
 0fe5e7	g_cell_min_mV	ram	Lowest cell voltage, mV (word); the cell index follows at 0x25E9.
 0fe5ee	g_total_volt_0p1V	ram	Pack voltage, 0.1 V.
-0fe61a	g_current_float	ram	Pack current as a float, A, from a second conversion; used by heater supervision. Sign convention not established.
+0fe61a	g_pa1_side_volt	ram	Voltage on the far (load/charger) side of PA1, float V, scaled like the pack voltage at RAM 0x2612. Used by heater supervision, the PA1 precharge target and charge detection with PA1 open.
 0fe61e	g_can4_regs_ptr	ram	Pointer to the CAN4 register block (0x0280), used by the command ISR and the telemetry scheduler.
 0fe622	g_can_x_regs_ptr	ram	Pointer to the CAN1 register block (0x0180), used by ISR_CAN1_rx and can_settings_multiframe_tx.
 0fe626	g_settings_frame410	ram	Settings frame 0x410 (8 bytes): capacity AH, cell count, temperature-probe count, module count.

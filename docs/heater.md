@@ -19,31 +19,65 @@ Relay outputs are written by `relay_output_update` every 100 ms, and only while 
 
 ## Stock automatic heating
 
-`heater_control` runs every 100 ms. It sets the request bit only when **all** of these hold:
+`heater_control` runs every 100 ms, after the alarm evaluators. It only heats in work mode 1
+(charging); in any other mode the request is cleared as soon as the output is on.
 
-| # | Condition | Setting |
+**Work mode 1** comes from `mode_detect_chg_dch`. With PA1 closed: at least 1 A of charge for
+3.1 s (31 passes). With PA1 open it compares voltages instead: `g_pa1_side_volt`, the charger side
+of PA1, at least 2.0 V above the pack. Below 1 A either way the mode never changes on its own.
+
+**The charge low-temperature alarm** (`g_alarm_chgTempLow`, copied into `g_alarm_tempLow_heater`)
+is evaluated only in charge mode and restarts each time charge mode begins. L1 sets after the
+coldest probe (`g_temp_min_0p1C`) is below `ch_temp_l1` (stock 5 °C) for about 1 s; it releases at
+`ch_temp_l1` + 5 °C. L2 (`ch_temp_l2`, stock 0 °C) releases at + 3 °C.
+
+In charge mode, in this order:
+
+| # | Condition | Heater |
 |---|---|---|
-| 1 | `g_work_mode` = 1 (charging). In any other mode the request is cleared as soon as the output is on. | |
-| 2 | Charge low-temperature alarm level ≥ 1, i.e. minimum temperature below charge low-temp L1. The alarm object is `g_alarm_tempLow_heater`. | `ch_temp_l1`, stock 5 °C |
-| 3 | Minimum temperature (`g_temp_min_0p1C`) not below discharge low-temp L3, with +1 °C hysteresis. | `dch_temp_l3` |
-| 4 | Not inside the cell-OV-L3 or below-L3 sub-state machines (`heater_ctrl_cellOV`, `heater_ctrl_belowL3`), whose retry counters (`g_heater_retry_cnt`) persist in external memory. | |
+| 1 | Coldest probe below `dch_temp_l3` (`g_heater_below_floor`, released 1 °C above) | off |
+| 2 | Charge low-temp L3 | `heater_ctrl_belowL3` if cell or pack UV L3 is also set; otherwise on under supervision |
+| 3 | No low-temp level | off |
+| 4 | L1 or L2 with cell or pack OV L3 | on, unsupervised |
+| 5 | L1 or L2 otherwise | the state machine below |
 
-Work mode 1 comes from `mode_detect_chg_dch`: about 1 A of charge for 3 s. CAN4 `0x100` d3 can also
-write the work mode, but mode detection re-derives it from measured current.
+The state machine is `heater_ctrl_cellOV` (a misnomer: it is the normal heating path):
 
-While stock heats, it sets bit 4 of the low-temperature alarm object (open the discharge contactor,
-PA1) and clears bit 5 (keep PA2). Stock auto-heating therefore opens PA1 while charging; see
+| State | Heater | Leaves when |
+|---|---|---|
+| 0 | off | charge current above 10 A (RAM `0x22A6` below −10.0) for 31 consecutive passes, 3.1 s: to 1. Any pass at 10 A or less restarts the count. |
+| 1 | on | more than 1 A of net discharge for about 1 s: back to 0. At L2, more than 10 A for 3.1 s: to 2. |
+| 2 | on, PA1 opened (supervised, L2) | `heater_sup_current_when_on` reports a failure: to 4 |
+| 3 | on, both cut bits set | the L2 bit changes |
+| 4 | off, waiting | the retry delay ends and a charge flag is set: to 2 |
+
+A change of the L2 bit returns any state to 0.
+
+**What this means in practice:** at L1 (between 0 °C and `ch_temp_l1`) the heater starts only when
+the charger pushes **more than 10 A** into the pack for 3 seconds without a break. Solar early in the
+morning, a slow-ramping DC-DC charger, or a current that dips with engine speed may never start it.
+The heater runs off the pack (it draws about 7.5 A), so once it is on the pack sees the charger's
+current minus the heater's. If that goes net negative for a second the heater stops, and it needs
+more than 10 A again to restart. Below 5 °C stock also asks the charger for at most 20 A
+([charge-limits.md](charge-limits.md)).
+
+**Supervision** (`heater_supervise`, `heater_sup_current_when_on`, `heater_sup_when_off`) applies
+only in state 2 and at L3. Despite the name it watches a **voltage**: `g_pa1_side_volt` below 5.0 V
+for 15 s (the charger has gone away while PA1 is open) marks the heater failed and turns it off,
+retrying after 10 s, then 10 min, then 30 min. Above 18.0 V for 5 s clears the failure count.
+
+**The retry counter** `g_heater_retry_cnt` (kept in external memory) locks heating out at 3 or more.
+It only increments when the heater runs during cell or pack UV L3, and `heater_control` clears it on
+every pass while SoC is 20 % or more.
+
+While stock heats in state 2 or at L3, it sets bit 4 of the low-temperature alarm object (open the
+discharge contactor, PA1) and clears bit 5 (keep PA2); see
 [alarms-and-contactors.md](alarms-and-contactors.md).
 
-**Supervision** (`heater_supervise`, `heater_sup_current_when_on`, `heater_sup_when_off`): with the
-heater on, charge current below 5.0 A for 15 s marks the heater failed and turns it off, retrying
-after 10 s, then 10 min, then 30 min. Charge current above 18 A for 5 s clears the failure count.
-Because the heater itself draws current, stock heating in practice needs a charge source that can
-supply roughly 8 A or more.
-
 **There is no stock CAN command that turns the heater on.** The only stock levers are forcing work
-mode 1 with `0x100` (overridden by mode detection) and raising `ch_temp_l1` with settings frame
-`0x415`, which still needs real charge current because of the supervision.
+mode 1 with `0x100` (mode detection overrides it after 3.1 s of 1 A or more either way) and raising
+`ch_temp_l1` with settings frame `0x415`, which still needs more than 10 A of real charge current
+to start the heater.
 
 ## Over-temperature inhibit (stock, kept)
 

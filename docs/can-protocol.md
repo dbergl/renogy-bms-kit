@@ -34,13 +34,14 @@ are not the BMS controller numbers.
 ## CAN4: frames the BMS accepts
 
 `ISR_CAN4_rx_commands` processes these only while `g_sys_state` is 3 (running) or 4. `dN` is data
-byte N.
+byte N. The "std"/"ext" marks show how each ID is normally sent; the match compares the numeric ID
+only, so an extended frame with ID 0x100 is accepted too.
 
 | ID | Match | Effect |
 |---|---|---|
 | `0x011` (std) | d0..d1 = `55 41` ("UA") | Infinite loop, COP watchdog reset, bootloader entry. |
 | `0x08F62DE2` (ext) | d0..d1 = "UA" | Bootloader entry, extended-ID form. |
-| `0x100` (std) | any | Charger/vehicle status. d2 bit 7 = balance enable, d2 bits 6..0 = balance difference threshold (mV), **d3 = `g_work_mode`** (1 charge, 3 discharge), d4:d5 = a word the balance selector does not use, d6:d7 = balance reference (mV). See [cell-balancing.md](cell-balancing.md). |
+| `0x100` (std) | any | Charger/vehicle status. d2 bit 7 = balance enable, d2 bits 6..0 = balance difference threshold (mV), **d3 = `g_work_mode`** (1 charge, 3 discharge; **0 freezes protection**, below), d4:d5 = a word the balance selector does not use, d6:d7 = balance reference (mV). See [cell-balancing.md](cell-balancing.md). |
 | `0x20F` (std) | d0..d1 = `AA AA` | Writes SoC = d2 to `g_soc_float` only. `soc_calc2` recomputes SoC from remaining Ah on the next 100 ms pass, so this has no lasting effect. |
 | `0x300` (std) | any | Copies 8 bytes to `g_msg300_data`, whatever the checksum. If d7 is the 8-bit sum of d0..d6 and d0 bit 2 is **set**, sets the reset bit (bit 3) on all 11 alarm objects. |
 | `0x310`–`0x313` (std) | any | Copies 8 bytes to `g_msg310_data`..`g_msg313_data`. **0x311 is the working SoC set:** if the last 0x300 had d0 bit 0 set, SoC = d5 (integer %, no range check) and remaining Ah = SoC/100 × capacity. |
@@ -48,8 +49,15 @@ byte N.
 | `0x500` (std) | d0..d1 = `AA AA` | d2 = 01 requests the settings dump (11 frames, 0x450–0x45A); d2 = 02 requests a second dump. |
 | `0x00000999` (ext) | any | In stock, stores its bytes to `g_cmd999_param0`, `g_cmd999_param1`, `g_cmd999_byte6`, `g_cmd999_byte7` and RAM `0x240E`, which nothing reads. **In every published recipe this case is inert**; the commands moved to CAN1 (below). |
 
-The 0x300 bit-2 test is a `BRSET` on `0x2680,#4`. Ghidra's decompiler shows it inverted, the same
-way its emulator mis-handles `BRSET` on this target (see [emulator-testing.md](emulator-testing.md)).
+**Work mode 0 is a hazard.** The main loop runs the whole 100 ms protection block (mode detection, the
+alarm evaluators, the relay state machines, SoC and the CAN1 register build) only while `g_work_mode` is
+not 0, and the only writers of the mode outside boot are mode detection itself (inside that block) and
+this 0x100 decoder. One 0x100 frame with d3 = 0 therefore freezes alarms and contactor updates until
+another 0x100 or a reset.
+
+The 0x300 bit-2 test is a `BRSET` on `0x2680,#4`. Stock Ghidra's decompiler shows it inverted, the same
+way its emulator mis-handles `BRSET` on this target (see [emulator-testing.md](emulator-testing.md));
+[the Ghidra walkthrough](ghidra-walkthrough.md) shows how to build a corrected decompiler.
 
 ## CAN4: periodic broadcasts
 
@@ -60,9 +68,12 @@ way its emulator mis-handles `BRSET` on this target (see [emulator-testing.md](e
 | `0x501` | d0..d3 = pack current as a float, copied verbatim from RAM `0x22A6` (**negative while charging**); d4..d7 = SoC float. |
 | `0x502` | Not decoded here. |
 | `0x503` | Includes the maximum temperature. |
-| `0x504` | d4 = maximum alarm level, d5 = alarm count, **d6 = relay byte** (below). |
+| `0x504` | d4 bits 7..6 = maximum alarm level (so 0x00/0x40/0x80/0xC0), d5 = alarm count, **d6 = relay byte** (below). |
 | `0x505` | d0 = work mode; d3..d4 = the charge current request, 0.1 A (the same RAM value as register 0x1390). |
 | `0x506`, `0x507` | Not decoded here. |
+| `0x508` | All zeros. |
+| `0x888` | Relay diagnostics: d0 = DC-DC precharge lockout (RAM `0x234F` bit 1), d1 = RAM `0x234E` bit 1, d2 = DC-DC retry count (RAM `0x2352`), d4 = RAM `0x2351`, d6 = RAM `0x2444`. Whether it goes out as a standard or extended frame is not verified. |
+| `0x666` | Not decoded here. |
 | `0x510`+ | Cell voltages, cells/4 + 1 frames. |
 | `0x550`+ | Temperatures. |
 | `0x401` | `AA AA …`, settings acknowledgement, sent on a flag (below). |
@@ -135,8 +146,11 @@ reply goes to `0x18EF{SA}70`. A priority-7 frame (`0x1CEF70xx`) does not match a
 | `18EF70xx#SSSSCCCC…` | d0:d1 = start register, d2:d3 = count, both big-endian. |
 | `18EF{xx}70#…` | Reply: 4 registers per frame, big-endian words, one frame per 50 ms pacing tick. |
 
-Two register windows are accepted, starting at 0x1388 and 0x13E3; start index + count must not
-exceed 40, or the frame is dropped before any state changes. Replies come out of a RAM mirror at
+The start register maps to an index: `start − 0x1388` when that is below 0x7A, otherwise
+`start − 0x13E3`. The index plus count must not exceed 40 (a 16-bit sum, so a huge count can wrap and
+pass). So 0x1388–0x13AF are readable, 0x13B0–0x1401 are refused, and 0x1402–0x140A alias the slots of
+0x13A7–0x13AF (the APS-500's 0x1402 poll reads those). A refused frame doesn't set the busy flag, but the requester's address, index and count
+are already stored by then. Replies come out of a RAM mirror at
 `0x23AE + (reg − 0x1388) × 2`, built by `task_soc_or_balance` (a misnomer: it builds the CAN1
 register values).
 
